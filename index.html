@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC 256-bit Generator (Offline Version)</title>
+    
+    <script src="bitcore-lib.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f9; color: #333; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 550px; width: 100%; }
+        h2 { color: #f7931a; text-align: center; margin-bottom: 25px; }
+        
+        .status-bar { padding: 10px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; text-align: center; font-size: 14px; }
+        .status-ok { background: #e6fffa; color: #285e61; border: 1px solid #b2f5ea; }
+        .status-err { background: #fff5f5; color: #9b2c2c; border: 1px solid #feb2b2; }
+
+        textarea { width: 100%; height: 80px; border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 14px; resize: none; transition: 0.3s; box-sizing: border-box; }
+        textarea:focus { border-color: #f7931a; outline: none; }
+
+        .controls { display: flex; gap: 10px; margin: 20px 0; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-random { background: #edf2f7; color: #4a5568; }
+        .btn-gen { background: #f7931a; color: white; font-size: 16px; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .result-box { display: none; margin-top: 25px; border-top: 2px dashed #e2e8f0; pt: 20px; }
+        .field { margin-top: 15px; }
+        .field label { display: block; font-size: 11px; color: #718096; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+        .value { background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #edf2f7; word-break: break-all; font-family: monospace; font-size: 13px; color: #2d3748; display: block; }
+        .btc-addr { color: #2b6cb0; font-weight: bold; font-size: 15px; border: 1px solid #bee3f8; background: #ebf8ff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Bitcoin Generator (256-bit)</h2>
+
+    <div id="status" class="status-bar status-err">
+        ⏳ Перевірка бібліотеки Bitcore...
+    </div>
+
+    <textarea id="bitInput" placeholder="Введіть 256 біт (0 або 1)..." maxlength="256"></textarea>
+    <div style="text-align: right; font-size: 12px; color: #a0aec0; margin-top: 5px;" id="counter">Бітів: 0/256</div>
+
+    <div class="controls">
+        <button class="btn-random" onclick="generateRandomBits()">Випадкові біти</button>
+        <button class="btn-gen" onclick="processBitcore()">Генерувати гаманець</button>
+    </div>
+
+    <div id="results" class="result-box">
+        <div class="field">
+            <label>Приватний ключ (WIF):</label>
+            <span id="wif" class="value"></span>
+        </div>
+        <div class="field">
+            <label>HEX формат:</label>
+            <span id="hex" class="value"></span>
+        </div>
+        <div class="field">
+            <label>Bitcoin Адреса (Legacy):</label>
+            <span id="addr" class="value btc-addr"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const statusBox = document.getElementById('status');
+    const bitInput = document.getElementById('bitInput');
+    const counter = document.getElementById('counter');
+    const results = document.getElementById('results');
+
+    // Перевірка при завантаженні
+    window.onload = function() {
+        if (typeof bitcore !== 'undefined') {
+            statusBox.innerText = "✅ Бібліотека підключена успішно!";
+            statusBox.className = "status-bar status-ok";
+        } else {
+            statusBox.innerText = "❌ Помилка: файл bitcore-lib.min.js не знайдено!";
+            statusBox.className = "status-bar status-err";
+        }
+    };
+
+    // Оновлення лічильника
+    bitInput.oninput = function() {
+        this.value = this.value.replace(/[^01]/g, '');
+        counter.innerText = `Бітів: ${this.value.length}/256`;
+    };
+
+    function generateRandomBits() {
+        let bits = "";
+        for(let i=0; i<256; i++) {
+            bits += Math.floor(Math.random() * 2);
+        }
+        bitInput.value = bits;
+        bitInput.oninput();
+    }
+
+    function processBitcore() {
+        const bits = bitInput.value;
+        
+        if (bits.length !== 256) {
+            alert("Потрібно рівно 256 біт (нулів та одиниць)!");
+            return;
+        }
+
+        if (typeof bitcore === 'undefined') {
+            alert("Бібліотека не знайдена. Перевірте файл bitcore-lib.min.js поруч із цим файлом.");
+            return;
+        }
+
+        try {
+            // Перетворюємо біти в HEX
+            let hex = "";
+            for (let i = 0; i < 256; i += 4) {
+                hex += parseInt(bits.substr(i, 4), 2).toString(16);
+            }
+            hex = hex.padStart(64, '0');
+
+            // Робота з Bitcore
+            const PrivateKey = bitcore.PrivateKey;
+            const privKey = new PrivateKey(hex);
+            const address = privKey.toAddress();
+
+            // Виведення результатів
+            document.getElementById('wif').innerText = privKey.toWIF();
+            document.getElementById('hex').innerText = hex.toUpperCase();
+            document.getElementById('addr').innerText = address.toString();
+            
+            results.style.display = "block";
+        } catch (e) {
+            alert("Помилка генерації: " + e.message);
+        }
+    }
+</script>
+
+</body>
+</html>
